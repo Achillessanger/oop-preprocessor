@@ -18,18 +18,24 @@ vector<string> split(string input, string delimiter);
 
 string include_process(string raw_code);
 
-string define_replace_process(string raw_code, map<string,string> define_map);
+string define_replace_process(string raw_code);
 
-string ifdef_process(vector<string> raws, int* ip, map<string,string> define_map);
+string ifdef_process(vector<string> raws, int* ip);
 
-string ifndef_process(vector<string> raws, int* ip, map<string,string> define_map);
+string ifndef_process(vector<string> raws, int* ip);
 
-string if_process(vector<string> raws, int* ip, map<string,string> define_map);
+string if_process(vector<string> raws, int* ip);
 
-map<string,string> define_build_map(string key, string value, map<string,string> map);
+map<string,string> define_build_map(string key, string value);
+string processor_jumptable(vector<string> raws, int* ip);
+bool need_process(string raw_code);
+void sort(string key);
+void built_define_map(string raw_code);
 
-vector<string> sort(map<string,string> mapp);
-
+const string DEFINDED = "havevalue";
+stack<bool> if_stack;
+vector<string> order_vec;
+map<string,string> define_map;
 
 int main() {
     for (int test_case_number = 1; test_case_number <= 2; test_case_number++) {
@@ -47,69 +53,20 @@ void run_test(int test_case_number) {
      * TODO: You'd better create new classes to handle your logic and use here only as an entrance.
      * */
     string processed_code;
-    map<string,string> define_map;
-//    define_map["1"] = "??";
-//    define_map.insert(make_pair("3","MM") );
-//
-//    cout << define_map.size();
-//
-//
-//    if(define_map.find("1") != define_map.end())
-//        cout<<"Find, the value is"<<define_map.find("1")->second<<endl;
-//    else
-//        cout<<"Do not Find"<<endl;
-//    map<string,string>::iterator it = define_map.begin();
-//    while (it != define_map.end()){
-//        cout<<it->first<<endl;
-//        it++;
-//    }
-
-
-    const string DEFINDED = "havevalue";
     vector<string> raws = split(raw_code,"\n");
+
+
     for(int i = 0; i < raws.size(); i++){
-        //#开头的
-        if(regex_match(raws[i],regex("# *include *.*")))
-            processed_code += include_process(raws[i]) + "\n";
-        else if(regex_match(raws[i],regex("# *define *.*"))){
-            string tmp = regex_replace(raws[i],regex("# *define *"),"");
-            if(tmp.find(" ") == string::npos){ //PART1 PART2 PART3
-                define_map[tmp] = DEFINDED;
-            } else{
-                string key = tmp.substr(0,tmp.find(" "));
-                string value = tmp.substr(tmp.find(" ")+1);
-                vector<string> order_vec = sort(define_map);
-                for(int k = 0; k < order_vec.size(); k++){
-                    if(regex_match(value,regex(".*"+order_vec[k]+".*"))){
-                        value = regex_replace(value,regex(order_vec[k]),define_map.find(order_vec[k])->second);
-                    }
-                }
-                define_map[key] = value;
-            }
-
-        } else if(regex_match(raws[i],regex("# *undef *.*"))){
-            define_map.erase(regex_replace(raws[i],regex("# *undef *"),""));
-        } else if(regex_match(raws[i],regex("# *ifdef *.*"))){
-            processed_code += ifdef_process(raws,&i,define_map) + "\n";
-        } else if(regex_match(raws[i],regex("# *ifndef *.*"))){
-            processed_code += ifndef_process(raws,&i,define_map) + "\n";
-        } else if(regex_match(raws[i],regex("# *if *.*"))){
-            processed_code += if_process(raws,&i,define_map) + "\n";
-        } else if(regex_match(raws[i],regex(" *//.*"))){
-            processed_code += raws[i] + "\n";
-        }else{
-            if(raws[i] == ""){
-                processed_code += "\n";
-                continue;
-            }
-            processed_code += define_replace_process(raws[i],define_map) + "\n";
-        }
+        processed_code += processor_jumptable(raws,&i);
     }
 
-    if(define_map.find("TRUE") != define_map.end()){
-        cout<<define_map.find("TRUE")->second<<endl;
-    }
 
+
+    //debug!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    cout<<" "<<endl;
+    for(map<string,string>::iterator it = define_map.begin(); it != define_map.end(); it++){
+        cout<<it->first+"  "+it->second<<endl;
+    }
 
 
     define_map.clear();
@@ -183,87 +140,81 @@ string include_process(string raw_code){
     }
 }
 
-string define_replace_process(string raw_code, map<string,string> define_map){
-    string buf;
-    stringstream ss(raw_code);
-    vector<string> tokens;
-    bool left_quot = false;
-    string tmp = "";
-    while (ss >> buf){
-        //引号内不替换
-        if(buf == "\"" and left_quot == false){
-            tmp = "";
-            left_quot = true;
-            tmp += buf;
-            continue;
-        } else if(buf != "\"" and left_quot){
-            tmp += buf;
-            continue;
-        } else if(buf == "\"" and left_quot){
-            tmp += buf;
-            tokens.push_back(tmp);
-            left_quot = false;
-            continue;
-        }
-        tokens.push_back(buf);
-    }
-
-    for(int k = 0; k < tokens.size(); k++){
-        if(regex_match(tokens[k],regex("\".*\""))) //引号里不预处理
-            continue;
-
-        string no_sign_code = regex_replace(tokens[k],regex("[^A-Za-z0-9]"),"");
-        if(no_sign_code == "")
-            continue;
-        while (define_map.find(no_sign_code) != define_map.end()){
-            tokens[k] = regex_replace(tokens[k],regex(no_sign_code),(define_map.find(no_sign_code))->second);
-            no_sign_code = regex_replace(tokens[k],regex("[^A-Za-z0-9]"),"");
-        }
-
-    }
-    string ret;
-    for(int k = 0; k < tokens.size(); k++){
-        ret += " " + tokens[k];
-    }
-    return ret;
-
-
-//    map<string,string>::iterator it = define_map.begin();
-//    string debugg = raw_code;
-//    while (it != define_map.end()){
-//        cout<<it->first+"  "+it->second[0]<<endl;
-//        if(regex_match(raw_code,regex(".*"+it->first+".*")) &&
-//           !regex_match(raw_code.substr(0,raw_code.find(it->first)),regex(".*[a-zA-Z0-9_]")) &&
-//           !regex_match(raw_code.substr(raw_code.find(it->first) + it->first.length()),regex("[a-zA-Z0-9_].*"))){
-//            raw_code = regex_replace(raw_code,regex(it->first),it->second);
+string define_replace_process(string raw_code){
+//    string buf;
+//    stringstream ss(raw_code);
+//    vector<string> tokens;
+//    bool left_quot = false;
+//    string tmp = "";
+//    while (ss >> buf){
+//        //寮曞彿鍐呬笉鏇挎崲
+//        if(buf == "\"" and left_quot == false){
+//            tmp = "";
+//            left_quot = true;
+//            tmp += buf;
+//            continue;
+//        } else if(buf != "\"" and left_quot){
+//            tmp += buf;
+//            continue;
+//        } else if(buf == "\"" and left_quot){
+//            tmp += buf;
+//            tokens.push_back(tmp);
+//            left_quot = false;
+//            continue;
 //        }
-//        it++;
+//        tokens.push_back(buf);
 //    }
-//    return raw_code;
+//
+//    for(int k = 0; k < tokens.size(); k++){
+//        if(regex_match(tokens[k],regex("\".*\""))) //寮曞彿閲屼笉棰勫�勭悊
+//            continue;
+//
+//        string no_sign_code = regex_replace(tokens[k],regex("[^A-Za-z0-9]"),"");
+//        if(no_sign_code == "")
+//            continue;
+//        while ((*define_map).find(no_sign_code) != (*define_map).end()){
+//            tokens[k] = regex_replace(tokens[k],regex(no_sign_code),((*define_map).find(no_sign_code))->second);
+//            no_sign_code = regex_replace(tokens[k],regex("[^A-Za-z0-9]"),"");
+//        }
+//
+//    }
+//    string ret;
+//    for(int k = 0; k < tokens.size(); k++){
+//        ret += " " + tokens[k];
+//    }
+//    return ret;
+
+
+    for(int i = 0; i < order_vec.size(); i++){
+        if(regex_match(raw_code,regex(".*"+order_vec[i]+".*"))){
+            raw_code = regex_replace(raw_code,regex(order_vec[i]),define_map.find(order_vec[i])->second);
+        }
+    }
+    return raw_code;
 
 }
 
-string ifdef_process(vector<string> raws, int* ip, map<string,string> define_map){
-    stack<bool> if_stack;
+string ifdef_process(vector<string> raws, int* ip){
+    int stack_size = if_stack.size();
     string ret;
     string content = regex_replace(raws[*ip],regex("# *ifdef *"),"");
     if_stack.push((define_map.find(content) != define_map.end()));
     (*ip)++;
     bool ignore = !if_stack.top();
-    while (!if_stack.empty()){
-        if(regex_match(raws[*ip],regex("# *ifdef *"))){
-            content = regex_replace(raws[*ip],regex("# *ifdef *"),"");
-            if_stack.push((define_map.find(content) != define_map.end()));
-            (*ip)++;
-            continue;
-        } else if(regex_match(raws[*ip],regex("# *endif *"))){
-            if_stack.pop();
+    while (stack_size != if_stack.size()){
+        if(need_process(raws[*ip])){
+            ret += processor_jumptable(raws,ip) + "\n";
             (*ip)++;
             continue;
         }
 
         if(regex_match(raws[*ip],regex("# *else *"))){
             ignore = !ignore;
+            (*ip)++;
+            continue;
+        }
+        if(regex_match(raws[*ip],regex("# *endif *"))) {
+            if_stack.pop();
             (*ip)++;
             continue;
         }
@@ -277,27 +228,27 @@ string ifdef_process(vector<string> raws, int* ip, map<string,string> define_map
     return ret;
 }
 
-string ifndef_process(vector<string> raws, int* ip, map<string,string> define_map){
-    stack<bool> if_stack;
+string ifndef_process(vector<string> raws, int* ip){
+    int stack_size = if_stack.size();
     string ret;
-    string content = regex_replace(raws[*ip],regex("# *ifdef *"),"");
+    string content = regex_replace(raws[*ip],regex("# *ifndef *"),"");
     if_stack.push((define_map.find(content) == define_map.end()));
     (*ip)++;
     bool ignore = !if_stack.top();
-    while (!if_stack.empty()){
-        if(regex_match(raws[*ip],regex("# *ifdef *"))){
-            content = regex_replace(raws[*ip],regex("# *ifdef *"),"");
-            if_stack.push((define_map.find(content) == define_map.end()));
-            (*ip)++;
-            continue;
-        } else if(regex_match(raws[*ip],regex("# *endif *"))){
-            if_stack.pop();
+    while (stack_size != if_stack.size()){
+        if(need_process(raws[*ip])){
+            ret += processor_jumptable(raws,ip) + "\n";
             (*ip)++;
             continue;
         }
 
         if(regex_match(raws[*ip],regex("# *else *"))){
             ignore = !ignore;
+            (*ip)++;
+            continue;
+        }
+        if(regex_match(raws[*ip],regex("# *endif *"))) {
+            if_stack.pop();
             (*ip)++;
             continue;
         }
@@ -311,8 +262,8 @@ string ifndef_process(vector<string> raws, int* ip, map<string,string> define_ma
     return ret;
 }
 
-string if_process(vector<string> raws, int* ip, map<string,string> define_map){
-    stack<bool> if_stack;
+string if_process(vector<string> raws, int* ip){
+    int stack_size = if_stack.size();
     string ret;
     string content = regex_replace(raws[*ip],regex("# *if *"),"");
     if(content == "TRUE" || content == "1"){
@@ -322,24 +273,20 @@ string if_process(vector<string> raws, int* ip, map<string,string> define_map){
     }
     (*ip)++;
     bool ignore = !if_stack.top();
-    while (!if_stack.empty()){
-        if(regex_match(raws[*ip],regex("# *ifdef *"))){
-            content = regex_replace(raws[*ip],regex("# *ifdef *"),"");
-            if(content == "TRUE" || content == "1"){
-                if_stack.push(true);
-            } else{
-                if_stack.push(false);
-            }
-            (*ip)++;
-            continue;
-        } else if(regex_match(raws[*ip],regex("# *endif *"))){
-            if_stack.pop();
+    while (stack_size != if_stack.size()){
+        if(need_process(raws[*ip])){
+            ret += processor_jumptable(raws,ip) + "\n";
             (*ip)++;
             continue;
         }
 
         if(regex_match(raws[*ip],regex("# *else *"))){
             ignore = !ignore;
+            (*ip)++;
+            continue;
+        }
+        if(regex_match(raws[*ip],regex("# *endif *"))) {
+            if_stack.pop();
             (*ip)++;
             continue;
         }
@@ -353,34 +300,76 @@ string if_process(vector<string> raws, int* ip, map<string,string> define_map){
     return ret;
 }
 
-//map<string,string> define_build_map(string key, string value, map<string,string> mapp){
-//    cout<<"start"<<endl;
-//    map<string,string>::iterator it = mapp.begin();
-//    string longest = it->first;
-//
-//
-//}
 
-vector<string> sort(map<string,string> mappp){
-//    map<string,string> ret;
-    map<string,string> mapp;
-    map<string,string>::iterator it;
-    for(it = mappp.begin(); it != mappp.end(); it++){
-        mapp[it->first] = it->second;
+
+
+void sort(string key){
+    vector<string>::iterator it = order_vec.begin();
+    for(; it != order_vec.end(); it++){
+        if(key.length() < it->length())
+            continue;
+        else{
+            order_vec.insert(it,1,key);
+            return;
+        }
     }
+    order_vec.push_back(key);
+    return;
+}
 
-    vector<string> retVec;
-    string longest;
-    while (mapp.size() != 0){
-        longest = mapp.begin()->first;
-        for(it = mapp.begin(); it != mapp.end(); it++){
-            if(longest.length() < it->first.length()){
-                longest = it->first;
+string processor_jumptable(vector<string> raws, int* ip){
+    string processed_code = "";
+    if(regex_match(raws[*ip],regex("# *include *.*")))
+        processed_code += include_process(raws[*ip]) + "\n";
+    else if(regex_match(raws[*ip],regex("# *define *.*"))){
+        built_define_map(raws[*ip]);
+    } else if(regex_match(raws[*ip],regex("# *undef *.*"))){
+        define_map.erase(regex_replace(raws[*ip],regex("# *undef *"),""));
+    } else if(regex_match(raws[*ip],regex("# *ifdef *.*"))){
+        processed_code += ifdef_process(raws,ip) + "\n";
+    } else if(regex_match(raws[*ip],regex("# *ifndef *.*"))){
+        processed_code += ifndef_process(raws,ip) + "\n";
+    } else if(regex_match(raws[*ip],regex("# *if *.*"))){
+        processed_code += if_process(raws,ip) + "\n";
+    } else if(regex_match(raws[*ip],regex(" *//.*"))){
+        processed_code += raws[*ip] + "\n";
+    }else{
+        if(raws[*ip] == ""){
+            processed_code += "\n";
+        }else
+            processed_code += define_replace_process(raws[*ip]) + "\n";
+    }
+    return processed_code;
+}
+
+bool need_process(string raw_code){
+    if(regex_match(raw_code,regex("# *include *.*"))||
+       regex_match(raw_code,regex("# *define *.*"))||
+       regex_match(raw_code,regex("# *undef *.*"))||
+       regex_match(raw_code,regex("# *ifdef *.*"))||
+       regex_match(raw_code,regex("# *ifndef *.*"))||
+       regex_match(raw_code,regex("# *if *.*"))||
+       regex_match(raw_code,regex(" *//.*")))
+        return true;
+    else
+        return false;
+}
+
+void built_define_map(string raw_code){
+    string tmp = regex_replace(raw_code,regex("# *define *"),"");
+    if(tmp.find(" ") == string::npos){ //PART1 PART2 PART3
+        define_map[tmp] = DEFINDED;
+        sort(tmp);
+    } else{
+        string key = tmp.substr(0,tmp.find(" "));
+        string value = tmp.substr(tmp.find(" ")+1);
+
+        for(int k = 0; k < order_vec.size(); k++){
+            if(regex_match(value,regex(".*"+order_vec[k]+".*"))){
+                value = regex_replace(value,regex(order_vec[k]),define_map.find(order_vec[k])->second);
             }
         }
-//        ret[longest] = mapp.find(longest)->second;
-        retVec.push_back(longest);
-        mapp.erase(longest);
+        define_map[key] = value;
+        sort(key);
     }
-    return retVec;
 }
