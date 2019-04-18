@@ -64,7 +64,7 @@ if (e == 17) {
 
 
 
-    int d = FUNC(a);
+    int d = (2*a);
     if (d == 2 * a) {
         std::cout << "PART 2 pass!!!!!" << std::endl;
     } else {
@@ -74,11 +74,11 @@ if (e == 17) {
 
 
 
-    std::cout << Cong(pass) << "!!!!!" << std::endl;
+    std::cout << "# ""pass" << "!!!!!" << std::endl;
 
 
 	int a_suffix = 1;
-	if (Token_con(a))
+	if (a_suffix)
 	{
 		std::cout << "## pass!!!!!" << std::endl;
 	}
