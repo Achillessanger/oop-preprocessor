@@ -29,9 +29,13 @@ string if_process(vector<string> raws, int* ip);
 map<string,string> define_build_map(string key, string value);
 string processor_jumptable(vector<string> raws, int* ip);
 vector<string> split_by_regex(string input, regex pattern);
+string connect_vector(vector<string> vec);
+string piece_replace(string raw_code);
 bool need_process(string raw_code);
 void sort(string key);
 void built_define_map(string raw_code);
+vector<string> args_sort(vector<string> args);
+
 
 const string DEFINDED = "havevalue";
 stack<bool> if_stack;
@@ -149,47 +153,71 @@ string include_process(string raw_code){
     }
 }
 
-string define_replace_process(string raw_code){
-    for(int i = 0; i < order_vec.size(); i++){
+string piece_replace(string raw_code) {
+    for (int i = 0; i < order_vec.size(); i++) {
         //如果define的是函数
-        if(regex_match(order_vec[i],regex(".*[(].*[)].*"))){
-            string args_list = regex_replace(order_vec[i],regex(".*[(]|[)].*"),"");
-            string fun_name = regex_replace(order_vec[i],regex("[(].*"),"");
+        if (regex_match(order_vec[i], regex(".*[(].*[)].*"))) {
+            string fun_name = regex_replace(order_vec[i], regex("[(].*"), "");
 
-            if(regex_match(raw_code,regex(".*"+fun_name+".*")) && !regex_match(raw_code,regex(".*[\"|\'].*"+fun_name+".*[\"|\'].*"))){
-                string args_list_in_code0 = regex_replace(raw_code,regex(".*[(]|[)].*"),"");
-                string args_list_in_code = regex_replace(args_list_in_code0,regex(",")," ");
-                args_list = regex_replace(args_list,regex(",")," ");
-                vector<string> args_in_code = split_by_regex(args_list_in_code,regex(" *[a-zA-Z0-9_]+ *"));
-                vector<string> args = split_by_regex(args_list,regex(" *[a-zA-Z0-9_]+ *"));
+            if (regex_match(raw_code, regex(".*" + fun_name + ".*"))) {
+                string args_list_in_code0 = regex_replace(raw_code, regex(".*[(]|[)].*"), "");
+                string args_list_in_code = regex_replace(args_list_in_code0, regex(","), " ");
+
+                vector<string> args_in_code = split_by_regex(args_list_in_code, regex(" *[a-zA-Z0-9_]+ *"));
+
                 string fun_body = define_map.find(order_vec[i])->second;
-                for(int k = 0; k < args.size(); k++){
-                    fun_body = regex_replace(fun_body,regex(args[k]),args_in_code[k]);
+                for (int k = 0; k < args_in_code.size(); k++) {
+                    fun_body = regex_replace(fun_body, regex("arg"+to_string(k)), args_in_code[k]);
                 }
                 //处理参数里的#,##
-                if(regex_match(fun_body,regex(".*##.*"))){
-                    fun_body = regex_replace(fun_body,regex(" *## *"),"");
-                } else if(regex_match(fun_body,regex(".*#.*"))){
-
+                if (regex_match(fun_body, regex(".*##.*"))) {
                     bool left_quot = false;
                     string fun_body2 = fun_body;
                     fun_body = "";
 
-                    while (fun_body2.length() != 0){
-                        string tmp = fun_body2.substr(0,1);
-                        if(!left_quot && tmp == "\""){
+                    while (fun_body2.length() != 0) {
+                        string tmp = fun_body2.substr(0, 1);
+                        if (!left_quot && tmp == "\"") {
                             left_quot = true;
-                        } else if(left_quot && tmp == "\""){
+                        } else if (left_quot && tmp == "\"") {
+                            left_quot = false;
+                        } else if(!left_quot && tmp == " "){
+                            fun_body2 = fun_body2.substr(1);
+                            continue;
+                        }
+
+                        if (!left_quot && fun_body2.substr(0, 2) == "##") {
+                            fun_body2 = fun_body2.substr(2);
+                            continue;
+                        } else if (left_quot && fun_body2.substr(0, 2) == "##") {
+                            fun_body += "##";
+                            fun_body2 = fun_body2.substr(2);
+                            continue;
+                        }
+                        fun_body += tmp;
+                        fun_body2 = fun_body2.substr(1);
+                    }
+
+                } else if (regex_match(fun_body, regex(".*#.*"))) {
+                    bool left_quot = false;
+                    string fun_body2 = fun_body;
+                    fun_body = "";
+
+                    while (fun_body2.length() != 0) {
+                        string tmp = fun_body2.substr(0, 1);
+                        if (!left_quot && tmp == "\"") {
+                            left_quot = true;
+                        } else if (left_quot && tmp == "\"") {
                             left_quot = false;
                         }
 
-                        if(!left_quot && tmp == "#"){
+                        if (!left_quot && tmp == "#") {
 
-                            tmp = "\""+fun_body2.substr(1,fun_body2.find(" ")-1)+"\"";
+                            tmp = "\"" + fun_body2.substr(1, fun_body2.find(" ") - 1) + "\"";
                             fun_body += tmp;
-                            if(fun_body2.find(" ") == -1){
+                            if (fun_body2.find(" ") == -1) {
                                 fun_body2 = "";
-                            } else{
+                            } else {
                                 fun_body2 = fun_body2.substr(fun_body2.find(" "));
                             }
                             continue;
@@ -200,19 +228,46 @@ string define_replace_process(string raw_code){
 
                 }
 
-                raw_code = regex_replace(raw_code,regex(fun_name+" *[(]"+args_list_in_code0+"[)]"),fun_body);
+                raw_code = regex_replace(raw_code, regex(fun_name + " *[(]" + args_list_in_code0 + "[)]"), fun_body);
             }
-        } else{
-            if(regex_match(raw_code,regex(".*"+order_vec[i]+".*"))){
-                raw_code = regex_replace(raw_code,regex(order_vec[i]),define_map.find(order_vec[i])->second);
+        } else {
+            if (regex_match(raw_code, regex(".*" + order_vec[i] + ".*"))) {
+                raw_code = regex_replace(raw_code, regex(order_vec[i]), define_map.find(order_vec[i])->second);
             }
         }
-
-
-
     }
-    return raw_code;
 
+    return raw_code;
+}
+
+string define_replace_process(string raw_code){
+
+    string raw_code_ret = "";
+    bool left_quo = false;
+    if(regex_match(raw_code,regex(".*\".*\".*"))){  //如果要替换的地方有引号，引号内不替换
+        while (raw_code.length() != 0){
+            if(raw_code.find("\"") != -1 && !left_quo){
+                left_quo = true;
+                raw_code_ret += piece_replace(raw_code.substr(0,raw_code.find("\"")));
+                raw_code = raw_code.substr(raw_code.find("\"")+1);
+            } else if(raw_code.find("\"") != -1 && left_quo){
+                left_quo = false;
+                raw_code_ret += "\"" + raw_code.substr(0,raw_code.find("\"")) + "\"";
+                if(raw_code.find("\"") != raw_code.length() - 1){
+                    raw_code = raw_code.substr(raw_code.find("\"")+1);
+                } else{
+                    raw_code = "";
+                }
+            } else if(!left_quo){
+                raw_code_ret += piece_replace(raw_code);
+                raw_code = "";
+            }
+        }
+    } else{
+        raw_code_ret += piece_replace(raw_code);
+    }
+
+    return raw_code_ret;
 }
 
 string ifdef_process(vector<string> raws, int* ip){
@@ -242,7 +297,6 @@ string ifdef_process(vector<string> raws, int* ip){
 
         if(!ignore){
             ret += define_replace_process(raws[*ip]) + "\n";
-//            ret += raws[*ip] + "\n";
         }
         (*ip)++;
     }
@@ -339,6 +393,23 @@ void sort(string key){
     return;
 }
 
+vector<string> args_sort(vector<string> args){
+    vector<string> ret;
+    vector<string>::iterator it;
+    ret.push_back(args[0]);
+    for(int k = 1; k < args.size(); k++){
+        for(it = ret.begin(); it != ret.end(); it++){
+            if(args[k].length() < it->length())
+                continue;
+            else{
+                ret.insert(it,1,args[k]);
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
 string processor_jumptable(vector<string> raws, int* ip){
     string processed_code = "";
     if(regex_match(raws[*ip],regex("# *include *.*")))
@@ -378,8 +449,6 @@ bool need_process(string raw_code){
 }
 
 void built_define_map(string raw_code){
-
-
     string tmp = regex_replace(raw_code,regex("# *define *"),"");
     if(tmp.find(" ") == string::npos){ //PART1 PART2 PART3
         define_map[tmp] = DEFINDED;
@@ -388,12 +457,75 @@ void built_define_map(string raw_code){
         string key = tmp.substr(0,tmp.find(" "));
         string value = tmp.substr(tmp.find(" ")+1);
 
-        for(int k = 0; k < order_vec.size(); k++){
-            if(regex_match(value,regex(".*"+order_vec[k]+".*"))){
-                value = regex_replace(value,regex(order_vec[k]),define_map.find(order_vec[k])->second);
+
+        if(!regex_match(key,regex(".*[(].*[)].*"))){
+            vector<string> replace_1by1 = split_by_regex(value,regex(" *[a-zA-Z0-9_]+[(]{0,1} *"));
+            for(int k = 0; k < replace_1by1.size(); k++){
+                if(define_map.find(replace_1by1[k]) != define_map.end()){
+                    replace_1by1[k] =  define_map.find(replace_1by1[k])->second;
+                }
             }
+        } else{
+            string args_str = regex_replace(key,regex(".*[(]|[)].*"),"");
+            vector<string> args = split_by_regex(args_str, regex(" *[a-zA-Z0-9_]+ *"));
+            string value0 = "";
+            bool left_quo = false;
+            vector<string> arg_sorted = args_sort(args);
+            if(regex_match(value,regex(".*\".*\".*"))){
+                string need_replace;
+                while (value.length() != 0){
+                    if(value.find("\"") != -1 && !left_quo){
+                        left_quo = true;
+                        need_replace = value.substr(0,value.find("\""));
+                        if(need_replace == ""){
+                            value = value.substr(1);
+                            continue;
+                        }else{
+                            for(int j = 0; j < arg_sorted.size(); j++){
+                                need_replace = regex_replace(need_replace,regex(arg_sorted[j]),"arg"+to_string(j));
+                            }
+                            value0 += need_replace;
+                        }
+                        value = value.substr(value.find("\"")+1);
+                    } else if(value.find("\"") != -1 && left_quo){
+                        left_quo = false;
+                        value0 += "\"" + value.substr(0,value.find("\"")) + "\"";
+                        if(value.find("\"") != value.length() - 1){
+                            value = value.substr(value.find("\"")+1);
+                        } else{
+                            value = "";
+                        }
+                    } else if(!left_quo){
+                        need_replace = value;
+                        for(int j = 0; j < arg_sorted.size(); j++){
+                            need_replace = regex_replace(need_replace,regex(arg_sorted[j]),"arg"+to_string(j));
+                        }
+                        value0 += need_replace;
+                        value = "";
+                    }
+                }
+                value = value0;
+            } else{
+                for(int j = 0; j < arg_sorted.size(); j++){
+                    value = regex_replace(value,regex(arg_sorted[j]),"arg"+to_string(j));
+                }
+            }
+
+            key = regex_replace(key,regex("[(].*[)]"),"()");
         }
+
         define_map[key] = value;
         sort(key);
     }
+}
+
+string connect_vector(vector<string> vec){
+    string ret = "";
+    for(int i = 0; i < vec.size(); i++){
+        ret += vec[i];
+        if(i != vec.size() - 1){
+            ret += " ";
+        }
+    }
+    return ret;
 }
